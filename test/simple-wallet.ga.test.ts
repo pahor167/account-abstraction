@@ -118,6 +118,22 @@ describe('SimpleAccountGA', function () {
   function generateMerkleTreeRoot(pairs: Pair[]) {
     const tree = getMerkletree(pairs)
     const root = bufferToHex(tree.getRoot())
+    console.log("leaf1111", bufferToHex(tree.getLeaf(0)))
+    console.log("leaf2222", bufferToHex(tree.getLeaf(1)))
+    return root
+  }
+
+  function generateDummyMerkleTreeRoot() {
+    const data = ["aa", "bb", "cc", "dd"]
+    const tree = new MerkleTree(data, (el: Buffer) => {
+      return Buffer.from(ethers.utils.keccak256(el), 'hex');
+  })
+    const root = bufferToHex(tree.getRoot())
+    console.log("dummy leaf1111", bufferToHex(tree.getLeaf(0)))
+    console.log("dummy leaf2222", bufferToHex(tree.getLeaf(1)))
+    console.log("dummy leaf2222", bufferToHex(tree.getLeaf(2)))
+    console.log("dummy leaf2222", bufferToHex(tree.getLeaf(4)))
+    console.log("dummy root", root);
     return root
   }
 
@@ -168,6 +184,7 @@ describe('SimpleAccountGA', function () {
 
     const data: Pair[] = [leafForProof, secondLeaf]
     const root = generateMerkleTreeRoot(data)
+    console.log("root", root);
     const proof = getMerkleTreeProof(data, leafForProof)
 
     await account.updateRoot(root, futureTimestamp)
@@ -175,9 +192,84 @@ describe('SimpleAccountGA', function () {
 
     const combined = pairToBytesString(leafForProof)
     // await account.execute2FA(combined, proof, accounts[2], ONE_ETH, '0x')
+    console.log("combined", combined);
 
     console.log("orig balance", (await ethers.provider.getBalance(accounts[2])).toString())
     const wrappedExecute = await account.populateTransaction.execute2FA(combined, proof, accounts[2], ONE_ETH, '0x')
+    console.log("wrappedExecute.data", wrappedExecute.data)
+    await account.execute(account.address, 0, wrappedExecute.data!)
+    console.log("after balance", (await ethers.provider.getBalance(accounts[2])).toString())
+  })
+
+  it('22 it should succeed execute -> execute2fa when valid proof is provided ', async () => {
+    generateDummyMerkleTreeRoot()
+    const { proxy: account } = await createAccountGA(ethers.provider.getSigner(), accounts[0], entryPoint)
+    console.log("account", account.address)
+
+    const futureTimestamp = 1686405818 + 60 * 60
+    console.log("futureTimestamp", futureTimestamp)
+
+    const leafForProof = { code: 1234, timestamp: futureTimestamp }
+    const secondLeaf = { code: 4567, timestamp: futureTimestamp + 300 * 1000 }
+
+    console.log("leaf1", pairToBytesString(leafForProof))
+    console.log("leaf2", pairToBytesString(secondLeaf))
+
+    const data: Pair[] = [leafForProof, secondLeaf]
+    const root = generateMerkleTreeRoot(data)
+    console.log("root", root);
+    const proof = getMerkleTreeProof(data, leafForProof)
+
+    await account.updateRoot(root, futureTimestamp)
+    await ethersSigner.sendTransaction({ from: accounts[0], to: account.address, value: parseEther('2') })
+
+    const combined = pairToBytesString(leafForProof)
+    // await account.execute2FA(combined, proof, accounts[2], ONE_ETH, '0x')
+    console.log("combined", combined);
+
+    console.log("orig balance", (await ethers.provider.getBalance(accounts[2])).toString())
+    const wrappedExecute = await account.populateTransaction.execute2FA(combined, proof, accounts[2], ONE_ETH, '0x')
+    console.log("wrappedExecute.data", wrappedExecute.data)
+    await account.execute(account.address, 0, wrappedExecute.data!)
+    console.log("after balance", (await ethers.provider.getBalance(accounts[2])).toString())
+  })
+
+  it('it should succeed execute -> execute2fa when valid proof is provided pregenerated', async () => {
+    const rootA = "ba2b310fa424ef178b6a76567822ed579a293edce7c7b03ef05e7033f96053eb"
+    const aa = {"leaf":"0000000000000000000000006484811e000000000000000000000000000ef0dd","proof":["7c5bf52576157168789e51fa6e526375e0706e74ceb849969be5ed51271d53b0","74036f8b8b4d29fa12d421989784d728f933623b99af0ec593a2a8e04caea52a","71873ff785fc177119d4c4d6d54cec45a38be1348dbac4b48d3b18fc932a01ac","23cadefc524b8e2ef8910cfbd1433f54726f871f8db555b833ad571358e141ce","be1cfde9a3b24fbaf074274da3843e741ae7b914056eef031a5a9e9db412fc9c","9425a2647ef28ff8e0b18cc0d1b84b7eac2ffa57d1997ef4db00517d5f7682fb","3b412f9de4e7c3ffd990d0aff5e92fbd0d8263de13947d627a0374678cb126ea","f7a87d3d2b2177876b87fe9df640579173d93c9a91eed7527e1b5391d680ee75","78f6dc617d7d882329b2c829369dc651dfe95750441628b3f30d85241e3c9c97","30d4fafefd3f3ab61351c97f9e4d02ed6628c6d5289bdccc747bc255118e8229","b17531cb5b6c7dafcd86f8b76542bb931b7793c30bf48b243b95a8dd4bc4d95b","778597afda5b6969b9078f6ba735e35cc058b97b04301414e49a8315c13496c9","0abbe6debabf0469379795d08a119c2ddff32eb325b529318b4e864e7a9aa697"]}
+
+    const root = `0x${rootA}`
+    const leaf = `0x${aa.leaf}`
+    const proof = aa.proof.map(k => `0x${k}`)
+
+    console.log("root", root);
+    console.log("leaf", leaf);
+    console.log("proof", proof);
+
+    const { proxy: account } = await createAccountGA(ethers.provider.getSigner(), accounts[0], entryPoint)
+    // console.log("account", account.address)
+    console.log("account cretea");
+    const futureTimestamp = getTimestamp(10)
+    // console.log("futureTimestamp", futureTimestamp)
+
+    // const leafForProof = { code: 1234, timestamp: futureTimestamp }
+    // const secondLeaf = { code: 4567, timestamp: futureTimestamp + 300 * 1000 }
+
+    // const data: Pair[] = [leafForProof, secondLeaf]
+    // const root = generateMerkleTreeRoot(data)
+    // const proof = getMerkleTreeProof(data, leafForProof)
+    console.log("futureTimestamp", futureTimestamp);
+    await account.updateRoot(root, futureTimestamp)
+    console.log("root updated");
+    await ethersSigner.sendTransaction({ from: accounts[0], to: account.address, value: parseEther('2') })
+    console.log("transaction sent");
+
+    // const leaf = pairToBytesString(leafForProof)
+    // await account.execute2FA(combined, proof, accounts[2], ONE_ETH, '0x')
+
+    console.log("orig balance", (await ethers.provider.getBalance(accounts[2])).toString())
+    console.log("accounts[2]", accounts[2])
+    const wrappedExecute = await account.populateTransaction.execute2FA(leaf, proof, accounts[2], ONE_ETH, '0x')
     console.log("wrappedExecute.data", wrappedExecute.data)
     await account.execute(account.address, 0, wrappedExecute.data!)
     console.log("after balance", (await ethers.provider.getBalance(accounts[2])).toString())
